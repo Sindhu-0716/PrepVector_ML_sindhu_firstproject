@@ -11,11 +11,28 @@ from sklearn.model_selection import train_test_split
 
 
 # Load Data and check Data Types
-uber_data = pd.read_csv('raw_data.csv')
+uber_data = pd.read_csv('C:/Users/TeZZa/UberETA/PrepVector_ML_sindhu_firstproject/uber_data.csv')
 print(uber_data.head())
 # Check data types
 print(uber_data.dtypes)
 print(uber_data.info())
+
+# Unique values of some categorical columns of df_train
+columns = ['Weatherconditions', 'Road_traffic_density',
+       'Vehicle_condition', 'Type_of_order', 'Type_of_vehicle',
+      'Multiple_deliveries', 'Festival', 'City_type']
+for column in columns:
+    unique_values = uber_data[column].unique().tolist()
+    print(column, ":", unique_values)
+# Extract the year from 'Order_Date'
+def extract_year(order_date):
+    try:
+        return pd.to_datetime(order_date, errors='coerce').year
+    except Exception as e:
+        return None
+
+uber_data['Order_Year'] = uber_data['Order_Date'].apply(extract_year)
+print("Years in the data:", uber_data['Order_Year'].unique())
 
 
 # Analyze null values
@@ -27,14 +44,6 @@ uber_data.replace("", np.nan, inplace=True)
 uber_data.replace(" ", np.nan, inplace=True)
 print(uber_data.isnull().sum())
 
-# Unique values of some categorical columns
-columns = ['Weather_conditions', 'Road_traffic_density',
-       'Vehicle_condition', 'Type_of_order', 'Type_of_vehicle',
-      'Multiple_deliveries', 'Festival', 'City_type']
-
-for column in columns:
-    unique_values = uber_data[column].unique().tolist()
-    print(column, ":", unique_values)
 
 # Convert String 'NaN' to np.nan
 '''
@@ -46,6 +55,7 @@ def convert_nan(df):
 convert_nan(uber_data)
 # Check null values
 uber_data.isnull().sum().sort_values(ascending=False)
+
 
 # Data Cleaning
 # 1. remove unecessary characters in columns, 
@@ -140,15 +150,8 @@ for factor in categorical_factors:
     else:
         print(f"Column '{factor}' not found in dataset.")
 
-# Extract the year from 'Order_Date'
-def extract_year(order_date):
-    try:
-        return pd.to_datetime(order_date, errors='coerce').year
-    except Exception as e:
-        return None
 
-uber_data['Order_Year'] = uber_data['Order_Date'].apply(extract_year)
-print("Years in the data:", uber_data['Order_Year'].unique())
+
 
 # Split the data into train and test sets
 train_data, test_data = train_test_split(uber_data, test_size=0.2, random_state=42)
@@ -190,6 +193,7 @@ if 'Time_Ordered' in train_data.columns:
         m = int((seconds % 3600) // 60)
         s = int(seconds % 60)
         return f"{h:02}:{m:02}:{s:02}"
+    
 
     train_data['Time_Ordered'] = train_data['Time_Ordered_seconds'].apply(seconds_to_time)
     train_data.drop(columns=['Time_Ordered_seconds'], inplace=True)
