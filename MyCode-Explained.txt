@@ -1,0 +1,54 @@
+Uber Delivery Time Prediction: Code Explanation
+
+1. Data Loading and Preprocessing
+- Dataset Loading:The dataset is loaded from a CSV file into a Pandas DataFrame.
+- Checking Data Types and Missing Values:We analyze both numerical and categorical columns for missing values and unique values to determine necessary data cleaning steps.
+- Replacing Empty Strings with NaN:Ensures consistency when detecting missing values.
+- Dropping Unnecessary Columns:Columns such as `ID`, `Delivery_person_ID`, and location coordinates are dropped as they are not useful for prediction.
+
+2. Feature Engineering
+- Haversine Distance Calculation:
+  - Computes the great-circle distance between restaurant and delivery location.
+  - A new feature `distance_km` is added to the dataset to provide an important predictor of delivery time.
+- Extracting Date-Based Features:
+  - `is_weekend`: Determines if the order was placed on a weekend.
+  - `month_intervals`: Categorizes orders into start, middle, or end of the month.
+  - `year_quarter`: Groups orders into quarterly segments of the year.
+- Calculating Order Preparation Time:
+  - Computes the time difference between `Time_Ordered` and `Time_Order_picked`.
+  - Uses formatted datetime calculations to handle cases where pickup occurs on the next day.
+  - Missing values in `order_prepare_time` are filled with the median value.
+
+3. Exploratory Data Analysis (EDA)
+- Bar Plots for Categorical Features:
+  - Displays the distribution of variables such as `City_type`, `Festival`, `Type_of_vehicle`, and `Weatherconditions`.
+- Correlation Heatmap for Numerical Factors:
+  - Analyzes how variables such as `distance_km`, `Delivery_person_Age`, and `Delivery_person_Ratings` influence `Time_taken(min)`.
+- Boxplots for Categorical Variables:
+  - Helps visualize how different categories impact delivery time.
+  - Identifies outliers and trends in features such as `Road_traffic_density`, `Weatherconditions`, and `Vehicle_condition`.
+
+4. Handling Missing Values
+- Imputation Strategy:
+  - Numerical Columns: Uses median imputation to maintain data consistency.
+  - Categorical Columns: Uses mode (most frequent value) imputation for categorical features.
+  - Ensures no missing values remain in the dataset after imputation.
+
+5. Encoding Categorical Variables
+- Label Encoding:
+  - Converts categorical values into numerical representations.
+  - Ensures consistency across train and test datasets.
+
+6. Splitting Data for Model Training
+- Train-Test Split:
+  - The dataset is split into training (80%) and testing (20%) sets to evaluate model performance.
+
+7. Model Training and Evaluation
+- Multiple Regression Models Tested:
+  - Linear Regression: Provides a baseline model.
+  - Random Forest Regressor: Uses 200 decision trees, `max_depth=15` for better generalization.
+  - Gradient Boosting Regressor: Uses 100 boosting stages with a learning rate adjustment.
+- Performance Metrics Used:
+  got the Random Forest as the best regressor with a R-squared (R2) Score of 0.82.
+
+
