@@ -39,7 +39,7 @@ def get_data(file_name):
 
 # ✅ Load & Show Raw Data
 st.write("### Raw Data")
-raw_data = get_data("C:/Users/TeZZa/Downloads/PrepVector_ML_Sindhu/EnergyPredictor/PJME_hourly.csv")  # Update Here
+raw_data = "PJME_hourly.csv"  # Update Here
 if raw_data is not None:
     st.dataframe(raw_data)
 
@@ -47,7 +47,7 @@ if raw_data is not None:
 # ✅ Forecasting Model Selection
 st.markdown("<h2 style='color:#a2d2fb;'>Energy Demand Forecasting</h2>", unsafe_allow_html=True)
 
-model_path = "C:/Users/TeZZa/Downloads/PrepVector_ML_Sindhu/EnergyPredictor/prophet_model.pkl"  # Update Here
+model_path = "prophet_model.pkl"  # Update Here
 
 # Check if model exists
 if not os.path.exists(model_path):
