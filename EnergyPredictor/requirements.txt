@@ -1,6 +1,4 @@
 plotly
 streamlit
 pandas
-pickle
-os
 prophet
