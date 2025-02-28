@@ -6,52 +6,52 @@ import os
 import requests
 from prophet import Prophet
 
-# ✅ GitHub Raw URL for the CSV file (Update if Repo Changes)
+# ✅ GitHub Raw URLs
 GITHUB_CSV_URL = "https://raw.githubusercontent.com/Sindhu-0716/PrepVector_ML_Sindhu/main/EnergyPredictor/PJME_hourly.csv"
+GITHUB_MODEL_URL = "https://raw.githubusercontent.com/Sindhu-0716/PrepVector_ML_Sindhu/main/EnergyPredictor/prophet_model.pkl"
 
 # ✅ Define local file paths
 csv_file = "PJME_hourly.csv"
 model_file = "prophet_model.pkl"
 
-# ✅ Function to download CSV if missing (for Streamlit Cloud)
-def download_csv():
-    if not os.path.exists(csv_file):
-        st.info(f"📥 Downloading CSV from GitHub: {GITHUB_CSV_URL}")
+# ✅ Function to download files
+def download_file(url, save_path):
+    if not os.path.exists(save_path):
+        st.info(f"📥 Downloading: {url}")
         try:
-            response = requests.get(GITHUB_CSV_URL)
-            response.raise_for_status()  # Raise error if request fails
-            with open(csv_file, "wb") as file:
-                file.write(response.content)  # Save CSV locally
-            st.success("✅ File downloaded successfully!")
+            response = requests.get(url)
+            response.raise_for_status()
+            with open(save_path, "wb") as file:
+                file.write(response.content)
+            st.success(f"✅ Downloaded successfully: {save_path}")
         except requests.exceptions.RequestException as e:
-            st.error(f"❌ Failed to download file: {e}")
+            st.error(f"❌ Failed to download {url}: {e}")
             st.stop()
 
 # ✅ Load Data Function
 def get_data():
-    if not os.path.exists(csv_file):
-        download_csv()  # Download if missing
+    download_file(GITHUB_CSV_URL, csv_file)  # Ensure CSV is available
 
     try:
-        data = pd.read_csv(csv_file)
+        df = pd.read_csv(csv_file)
 
         # Ensure correct column names
-        if "PJME_MW" in data.columns:
-            data.rename(columns={"PJME_MW": "y"}, inplace=True)
+        if "PJME_MW" in df.columns:
+            df.rename(columns={"PJME_MW": "y"}, inplace=True)
 
         # Convert first column to datetime
-        if 'ds' in data.columns:
-            data['ds'] = pd.to_datetime(data['ds'])
+        if 'ds' in df.columns:
+            df['ds'] = pd.to_datetime(df['ds'])
         else:
-            data.rename(columns={data.columns[0]: 'ds'}, inplace=True)
-            data['ds'] = pd.to_datetime(data['ds'])
+            df.rename(columns={df.columns[0]: 'ds'}, inplace=True)
+            df['ds'] = pd.to_datetime(df['ds'])
 
         # Validate required columns
-        if 'ds' not in data.columns or 'y' not in data.columns:
+        if 'ds' not in df.columns or 'y' not in df.columns:
             st.error("❌ Missing required columns 'ds' and 'y'. Ensure CSV format is correct.")
             return None
 
-        return data
+        return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
@@ -82,22 +82,10 @@ if raw_data is None:
 # ✅ Display First Few Rows
 st.dataframe(raw_data.head())
 
-# ✅ Model Handling
-st.markdown("<h2 style='color:#a2d2fb;'>Energy Demand Forecasting</h2>", unsafe_allow_html=True)
+# ✅ Download Model from GitHub (if missing)
+download_file(GITHUB_MODEL_URL, model_file)
 
-# ✅ Check if Model Exists
-if not os.path.exists(model_file):
-    st.warning(f"⚠️ Model file not found: {model_file}. Training a new model...")
-
-    # ✅ Train & Save Model
-    with st.spinner("Training model..."):
-        model = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True)
-        model.fit(raw_data[['ds', 'y']])  # Fit only 'ds' and 'y' columns
-        with open(model_file, "wb") as file:
-            pickle.dump(model, file)
-        st.success("✅ Model trained and saved successfully! Reloading...")
-
-# ✅ Load Model
+# ✅ Load Prophet Model
 with open(model_file, "rb") as file:
     model = pickle.load(file)
 
@@ -118,7 +106,7 @@ fig = go.Figure()
 # 🔹 Plot actual data
 fig.add_trace(go.Scatter(x=raw_data["ds"], y=raw_data["y"], mode='lines', name='Actual Demand', line=dict(color='blue', width=2)))
 
-# 🔹 Plot forecast
+# 🔹 Plot forecast (✅ Fixed Syntax Error)
 fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode='lines', name='Forecast', line=dict(color='orange', width=2)))
 
 # 🔹 Confidence interval shading
