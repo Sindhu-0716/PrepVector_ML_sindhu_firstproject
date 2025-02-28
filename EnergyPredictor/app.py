@@ -1,21 +1,20 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import pickle
 import os
 import requests
-from prophet import Prophet
 
-# ✅ GitHub Raw URLs
+# ✅ GitHub Raw URLs for Data
 GITHUB_CSV_URL = "https://raw.githubusercontent.com/Sindhu-0716/PrepVector_ML_Sindhu/main/EnergyPredictor/PJME_hourly.csv"
-GITHUB_MODEL_URL = "https://raw.githubusercontent.com/Sindhu-0716/PrepVector_ML_Sindhu/main/EnergyPredictor/prophet_model.pkl"
+GITHUB_FORECAST_URL = "https://raw.githubusercontent.com/Sindhu-0716/PrepVector_ML_Sindhu/main/EnergyPredictor/forecast.csv"
 
-# ✅ Define local file paths
+# ✅ Local file paths
 csv_file = "PJME_hourly.csv"
-model_file = "prophet_model.pkl"
+forecast_file = "forecast.csv"
 
-# ✅ Function to download files
+# ✅ Function to download files from GitHub
 def download_file(url, save_path):
+    """Downloads a file from a URL if it doesn't exist locally."""
     if not os.path.exists(save_path):
         try:
             response = requests.get(url)
@@ -26,77 +25,86 @@ def download_file(url, save_path):
             st.error(f"❌ Failed to download {url}: {e}")
             st.stop()
 
-# ✅ Load Data Function (Mini Version)
+# ✅ Load Historical Data
 def get_data():
-    download_file(GITHUB_CSV_URL, csv_file)  # Ensure CSV is available
+    """Loads the raw energy demand data from GitHub."""
+    download_file(GITHUB_CSV_URL, csv_file)
     try:
         df = pd.read_csv(csv_file)
         df.rename(columns={"PJME_MW": "y"}, inplace=True)
         df.rename(columns={df.columns[0]: 'ds'}, inplace=True)
         df["ds"] = pd.to_datetime(df["ds"])
-        return df.tail(5000)  # Load only last 5000 rows for efficiency
+        return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
 
+# ✅ Load Precomputed Forecast Data
+def get_forecast():
+    """Loads the precomputed forecast data from GitHub."""
+    download_file(GITHUB_FORECAST_URL, forecast_file)
+    try:
+        df = pd.read_csv(forecast_file)
+        df["ds"] = pd.to_datetime(df["ds"])
+        return df
+    except Exception as e:
+        st.error(f"Error loading forecast data: {e}")
+        return None
+
 # ✅ Set Page Configuration
 st.set_page_config(
-    page_title="Mini Demand Forecasting",
-    page_icon=":chart_with_upwards_trend:",
+    page_title="Static Energy Demand Forecasting",
+    page_icon=":bar_chart:",
     layout="wide",
 )
 
-# ✅ Title & Styling
-st.markdown("<h1 style='text-align: center; color:#faa356;'>Mini Demand Forecasting 📉</h1>", unsafe_allow_html=True)
+# ✅ Title
+st.markdown("<h1 style='text-align: center; color:#faa356;'>Static Energy Demand Forecasting 📉</h1>", unsafe_allow_html=True)
 
 # ✅ Load & Show Raw Data
-st.write("### Raw Data (Limited for Cloud)")
+st.write("### 📊 Raw Energy Demand Data")
 raw_data = get_data()
 if raw_data is None:
     st.stop()
-st.dataframe(raw_data.head())
+st.dataframe(raw_data)
 
-# ✅ Download Model from GitHub (Mini Version)
-download_file(GITHUB_MODEL_URL, model_file)
+# ✅ Load & Show Forecast Data
+st.write("### 🔮 Precomputed Forecast Data")
+forecast_data = get_forecast()
+if forecast_data is None:
+    st.stop()
+st.dataframe(forecast_data)
 
-# ✅ Cache Model Loading to Reduce Memory Usage
-@st.cache_resource
-def load_model():
-    with open(model_file, "rb") as file:
-        return pickle.load(file)
-
-# ✅ Load Prophet Model
-model = load_model()
-
-# ✅ Limited Forecasting (Mini Version)
-days = st.slider("Select Forecasting Days", min_value=1, max_value=7, value=3)  # Limit to 7 days
-forecast_hours = days * 24
-
-future = model.make_future_dataframe(periods=forecast_hours, freq='H')
-forecast = model.predict(future)
-
-# ✅ Show Forecasted Data
-st.write("### Forecasted Data (Mini Version)")
-st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].head())
-
-# ✅ Plot Forecast (Mini Version)
+# ✅ Plot Forecast
 fig = go.Figure()
 
-# 🔹 Plot actual data
-fig.add_trace(go.Scatter(x=raw_data["ds"], y=raw_data["y"], mode='lines', name='Actual Demand', line=dict(color='blue', width=2)))
+# 🔹 Plot actual data (last 1000 points to avoid lag)
+fig.add_trace(go.Scatter(
+    x=raw_data["ds"].iloc[-1000:], 
+    y=raw_data["y"].iloc[-1000:], 
+    mode='lines', 
+    name='Actual Demand', 
+    line=dict(color='blue', width=2)
+))
 
-# 🔹 Plot forecast (Mini Version)
-fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode='lines', name='Forecast', line=dict(color='orange', width=2)))
+# 🔹 Plot precomputed forecast
+fig.add_trace(go.Scatter(
+    x=forecast_data["ds"], 
+    y=forecast_data["yhat"], 
+    mode='lines', 
+    name='Forecast', 
+    line=dict(color='orange', width=2)
+))
 
 # 🔹 Confidence interval shading
 fig.add_trace(go.Scatter(
-    x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1], 
-    y=forecast["yhat_upper"].tolist() + forecast["yhat_lower"].tolist()[::-1],
+    x=forecast_data["ds"].tolist() + forecast_data["ds"].tolist()[::-1], 
+    y=forecast_data["yhat_upper"].tolist() + forecast_data["yhat_lower"].tolist()[::-1],
     fill='toself',
     fillcolor='rgba(255, 165, 0, 0.2)',
     line=dict(color='rgba(255,255,255,0)'),
     name='Confidence Interval'
 ))
 
-fig.update_layout(title="Mini Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
+fig.update_layout(title="Static Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
 st.plotly_chart(fig)
