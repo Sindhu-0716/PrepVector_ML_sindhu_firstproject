@@ -74,37 +74,40 @@ forecast_data = get_forecast()
 if forecast_data is None:
     st.stop()
 st.dataframe(forecast_data)
+# ✅ Ensure Enough Data is Being Plotted
+if len(forecast_data) > 1:
+    fig = go.Figure()
 
-# ✅ Plot Forecast
-fig = go.Figure()
+    # 🔹 Plot actual data (showing last 1000 points to avoid lag)
+    fig.add_trace(go.Scatter(
+        x=raw_data["ds"].iloc[-1000:], 
+        y=raw_data["y"].iloc[-1000:], 
+        mode='lines', 
+        name='Actual Demand', 
+        line=dict(color='blue', width=2)
+    ))
 
-# 🔹 Plot actual data (last 1000 points to avoid lag)
-fig.add_trace(go.Scatter(
-    x=raw_data["ds"].iloc[-1000:], 
-    y=raw_data["y"].iloc[-1000:], 
-    mode='lines', 
-    name='Actual Demand', 
-    line=dict(color='blue', width=2)
-))
+    # 🔹 Plot precomputed forecast (full dataset)
+    fig.add_trace(go.Scatter(
+        x=forecast_data["ds"], 
+        y=forecast_data["yhat"], 
+        mode='lines', 
+        name='Forecast", 
+        line=dict(color='orange', width=2)
+    ))
 
-# 🔹 Plot precomputed forecast
-fig.add_trace(go.Scatter(
-    x=forecast_data["ds"], 
-    y=forecast_data["yhat"], 
-    mode='lines', 
-    name='Forecast', 
-    line=dict(color='orange', width=2)
-))
+    # 🔹 Confidence interval shading
+    fig.add_trace(go.Scatter(
+        x=forecast_data["ds"].tolist() + forecast_data["ds"].tolist()[::-1], 
+        y=forecast_data["yhat_upper"].tolist() + forecast_data["yhat_lower"].tolist()[::-1],
+        fill='toself',
+        fillcolor='rgba(255, 165, 0, 0.2)',
+        line=dict(color='rgba(255,255,255,0)'),
+        name='Confidence Interval"
+    ))
 
-# 🔹 Confidence interval shading
-fig.add_trace(go.Scatter(
-    x=forecast_data["ds"].tolist() + forecast_data["ds"].tolist()[::-1], 
-    y=forecast_data["yhat_upper"].tolist() + forecast_data["yhat_lower"].tolist()[::-1],
-    fill='toself',
-    fillcolor='rgba(255, 165, 0, 0.2)',
-    line=dict(color='rgba(255,255,255,0)'),
-    name='Confidence Interval'
-))
+    fig.update_layout(title="Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
+    st.plotly_chart(fig)
+else:
+    st.error("❌ Forecast data is too small to visualize. Please regenerate `forecast.csv` with more steps.")
 
-fig.update_layout(title="Static Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
-st.plotly_chart(fig)
