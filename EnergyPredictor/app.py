@@ -54,7 +54,7 @@ def get_data(file_path):
 
 # ✅ Load & Show Raw Data
 st.write("### Raw Data")
-file_path = "C:/Users/TeZZa/Downloads/PrepVector_ML_Sindhu/EnergyPredictor/PJME_hourly.csv"
+file_path = "PJME_hourly.csv"
 
 raw_data = get_data(file_path)  
 
@@ -68,7 +68,7 @@ st.dataframe(raw_data.head())
 # ✅ Forecasting Model Selection
 st.markdown("<h2 style='color:#a2d2fb;'>Energy Demand Forecasting</h2>", unsafe_allow_html=True)
 
-model_path = "C:/Users/TeZZa/Downloads/PrepVector_ML_Sindhu/EnergyPredictor/prophet_model.pkl"
+model_path = "prophet_model.pkl"
 
 # Check if model exists
 if not os.path.exists(model_path):
