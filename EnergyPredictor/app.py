@@ -33,7 +33,7 @@ def get_data():
         df = pd.read_csv(csv_file)
         df.rename(columns={"PJME_MW": "y"}, inplace=True)
         df.rename(columns={df.columns[0]: 'ds'}, inplace=True)
-        df["ds"] = pd.to_datetime(df["ds"])
+        df["ds"] = pd.to_datetime(df["ds"], format='%Y-%m-%d %H:%M:%S')  # ✅ Ensure correct format
         return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -62,52 +62,49 @@ st.set_page_config(
 st.markdown("<h1 style='text-align: center; color:#faa356;'>Static Energy Demand Forecasting 📉</h1>", unsafe_allow_html=True)
 
 # ✅ Load & Show Raw Data
-st.write("### 📊 Raw Energy Demand Data")
+st.write("### 📊 Raw Energy Demand Data (2002 - 2018)")
 raw_data = get_data()
 if raw_data is None:
     st.stop()
 st.dataframe(raw_data)
 
 # ✅ Load & Show Forecast Data
-st.write("### 🔮 Precomputed Forecast Data")
+st.write("### 🔮 Precomputed Forecast Data (2018 - 2023)")
 forecast_data = get_forecast()
 if forecast_data is None:
     st.stop()
 st.dataframe(forecast_data)
-# ✅ Ensure Enough Data is Being Plotted
-if len(forecast_data) > 1:
-    fig = go.Figure()
 
-    # 🔹 Plot actual data (showing last 1000 points to avoid lag)
-    fig.add_trace(go.Scatter(
-        x=raw_data["ds"].iloc[-1000:], 
-        y=raw_data["y"].iloc[-1000:], 
-        mode='lines', 
-        name='Actual Demand', 
-        line=dict(color='blue', width=2)
-    ))
+# ✅ Plot Forecast
+fig = go.Figure()
 
-    # 🔹 Plot precomputed forecast (full dataset)
-    fig.add_trace(go.Scatter(
-        x=forecast_data["ds"], 
-        y=forecast_data["yhat"], 
-        mode='lines', 
-        name='Forecast", 
-        line=dict(color='orange', width=2)
-    ))
+# 🔹 Plot actual data (showing full 2002-2018 range)
+fig.add_trace(go.Scatter(
+    x=raw_data["ds"],  # ✅ Show full range instead of limiting to last 1000 points
+    y=raw_data["y"], 
+    mode='lines', 
+    name='Actual Demand', 
+    line=dict(color='blue', width=2)
+))
 
-    # 🔹 Confidence interval shading
-    fig.add_trace(go.Scatter(
-        x=forecast_data["ds"].tolist() + forecast_data["ds"].tolist()[::-1], 
-        y=forecast_data["yhat_upper"].tolist() + forecast_data["yhat_lower"].tolist()[::-1],
-        fill='toself',
-        fillcolor='rgba(255, 165, 0, 0.2)',
-        line=dict(color='rgba(255,255,255,0)'),
-        name='Confidence Interval"
-    ))
+# 🔹 Plot precomputed forecast (full dataset)
+fig.add_trace(go.Scatter(
+    x=forecast_data["ds"], 
+    y=forecast_data["yhat"], 
+    mode='lines', 
+    name='Forecast',  # ✅ Fixed syntax error
+    line=dict(color='orange', width=2)
+))
 
-    fig.update_layout(title="Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
-    st.plotly_chart(fig)
-else:
-    st.error("❌ Forecast data is too small to visualize. Please regenerate `forecast.csv` with more steps.")
+# 🔹 Confidence interval shading
+fig.add_trace(go.Scatter(
+    x=forecast_data["ds"].tolist() + forecast_data["ds"].tolist()[::-1], 
+    y=forecast_data["yhat_upper"].tolist() + forecast_data["yhat_lower"].tolist()[::-1],
+    fill='toself',
+    fillcolor='rgba(255, 165, 0, 0.2)',
+    line=dict(color='rgba(255,255,255,0)'),
+    name='Confidence Interval'
+))
 
+fig.update_layout(title="Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
+st.plotly_chart(fig)
