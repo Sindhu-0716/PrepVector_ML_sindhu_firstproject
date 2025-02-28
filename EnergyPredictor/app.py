@@ -20,7 +20,7 @@ st.markdown("""
     This app provides a user-friendly interface for forecasting electricity demand.</p>
     """, unsafe_allow_html=True)
 
-# ✅ Data Loading Function
+# ✅ Data Loading Function (Improved Error Handling)
 def get_data(file_path):
     try:
         if not os.path.exists(file_path):
@@ -28,21 +28,21 @@ def get_data(file_path):
             return None  
 
         # Read CSV and ensure proper date format
-        data = pd.read_csv(file_path, parse_dates=[0])
+        data = pd.read_csv(file_path)
         
-        # Rename columns if necessary
+        # Ensure column names
         if "PJME_MW" in data.columns:
             data.rename(columns={"PJME_MW": "y"}, inplace=True)
         
-        # Ensure datetime format
+        # Convert first column to datetime
         if 'ds' in data.columns:
             data['ds'] = pd.to_datetime(data['ds'])
         else:
-            # Assuming first column is the date
+            # Assuming first column is datetime
             data.rename(columns={data.columns[0]: 'ds'}, inplace=True)
             data['ds'] = pd.to_datetime(data['ds'])
 
-        # Ensure correct structure for Prophet
+        # Validate required columns
         if 'ds' not in data.columns or 'y' not in data.columns:
             st.error("❌ Missing required columns 'ds' and 'y' for Prophet.")
             return None
@@ -57,8 +57,13 @@ st.write("### Raw Data")
 file_path = "C:/Users/TeZZa/Downloads/PrepVector_ML_Sindhu/EnergyPredictor/PJME_hourly.csv"
 
 raw_data = get_data(file_path)  
-if raw_data is not None:
-    st.dataframe(raw_data.head())
+
+# 🛑 Stop the app if data is missing
+if raw_data is None:
+    st.stop()
+
+# Display the first few rows
+st.dataframe(raw_data.head())
 
 # ✅ Forecasting Model Selection
 st.markdown("<h2 style='color:#a2d2fb;'>Energy Demand Forecasting</h2>", unsafe_allow_html=True)
