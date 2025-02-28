@@ -1,25 +1,110 @@
+import streamlit as st
 import pandas as pd
-import pickle
-from prophet import Prophet
+import plotly.graph_objects as go
+import os
+import requests
 
-# ✅ Load CSV File (Make sure PJME_hourly.csv is in the same folder)
-file_path = "PJME_hourly.csv"
-df = pd.read_csv(file_path)
+# ✅ GitHub Raw URLs for Data
+GITHUB_CSV_URL = "https://raw.githubusercontent.com/Sindhu-0716/PrepVector_ML_Sindhu/main/EnergyPredictor/PJME_hourly.csv"
+GITHUB_FORECAST_URL = "https://raw.githubusercontent.com/Sindhu-0716/PrepVector_ML_Sindhu/main/EnergyPredictor/forecast.csv"
 
-# ✅ Rename and Format Data for Prophet
-df.rename(columns={"PJME_MW": "y"}, inplace=True)  # Rename target column
-df.rename(columns={df.columns[0]: "ds"}, inplace=True)  # Ensure first column is datetime
-df["ds"] = pd.to_datetime(df["ds"])  # Convert 'ds' to datetime format
+# ✅ Local file paths
+csv_file = "PJME_hourly.csv"
+forecast_file = "forecast.csv"
 
-# ✅ Train Prophet Model
-model = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=False)  # Disable daily seasonality for efficiency
-model.fit(df[['ds', 'y']])
+# ✅ Function to download files from GitHub
+def download_file(url, save_path):
+    """Downloads a file from a URL if it doesn't exist locally."""
+    if not os.path.exists(save_path):
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            with open(save_path, "wb") as file:
+                file.write(response.content)
+        except requests.exceptions.RequestException as e:
+            st.error(f"❌ Failed to download {url}: {e}")
+            st.stop()
 
-# ✅ Make Future Predictions (Static Forecast)
-future = model.make_future_dataframe(periods=30 * 24, freq='H')  # Forecast for the next 30 days (hourly)
-forecast = model.predict(future)
+# ✅ Load Historical Data
+def get_data():
+    """Loads the raw energy demand data from GitHub."""
+    download_file(GITHUB_CSV_URL, csv_file)
+    try:
+        df = pd.read_csv(csv_file)
+        df.rename(columns={"PJME_MW": "y"}, inplace=True)
+        df.rename(columns={df.columns[0]: 'ds'}, inplace=True)
+        df["ds"] = pd.to_datetime(df["ds"])
+        return df
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None
 
-# ✅ Save Forecasted Data as CSV
-forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].to_csv("forecast.csv", index=False)
+# ✅ Load Precomputed Forecast Data
+def get_forecast():
+    """Loads the precomputed forecast data from GitHub."""
+    download_file(GITHUB_FORECAST_URL, forecast_file)
+    try:
+        df = pd.read_csv(forecast_file)
+        df["ds"] = pd.to_datetime(df["ds"])
+        return df
+    except Exception as e:
+        st.error(f"Error loading forecast data: {e}")
+        return None
 
-print("✅ Forecast saved successfully as 'forecast.csv' in your local folder.")
+# ✅ Set Page Configuration
+st.set_page_config(
+    page_title="Static Energy Demand Forecasting",
+    page_icon=":bar_chart:",
+    layout="wide",
+)
+
+# ✅ Title
+st.markdown("<h1 style='text-align: center; color:#faa356;'>Static Energy Demand Forecasting 📉</h1>", unsafe_allow_html=True)
+
+# ✅ Load & Show Raw Data
+st.write("### 📊 Raw Energy Demand Data")
+raw_data = get_data()
+if raw_data is None:
+    st.stop()
+st.dataframe(raw_data)
+
+# ✅ Load & Show Forecast Data
+st.write("### 🔮 Precomputed Forecast Data")
+forecast_data = get_forecast()
+if forecast_data is None:
+    st.stop()
+st.dataframe(forecast_data)
+
+# ✅ Plot Forecast
+fig = go.Figure()
+
+# 🔹 Plot actual data (showing last 1000 points to avoid lag)
+fig.add_trace(go.Scatter(
+    x=raw_data["ds"].iloc[-1000:], 
+    y=raw_data["y"].iloc[-1000:], 
+    mode='lines', 
+    name='Actual Demand', 
+    line=dict(color='blue', width=2)
+))
+
+# 🔹 Plot precomputed forecast (full dataset)
+fig.add_trace(go.Scatter(
+    x=forecast_data["ds"], 
+    y=forecast_data["yhat"], 
+    mode='lines', 
+    name='Forecast',  # ✅ Fixed syntax error
+    line=dict(color='orange', width=2)
+))
+
+# 🔹 Confidence interval shading
+fig.add_trace(go.Scatter(
+    x=forecast_data["ds"].tolist() + forecast_data["ds"].tolist()[::-1], 
+    y=forecast_data["yhat_upper"].tolist() + forecast_data["yhat_lower"].tolist()[::-1],
+    fill='toself',
+    fillcolor='rgba(255, 165, 0, 0.2)',
+    line=dict(color='rgba(255,255,255,0)'),
+    name='Confidence Interval'
+))
+
+fig.update_layout(title="Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
+st.plotly_chart(fig)
