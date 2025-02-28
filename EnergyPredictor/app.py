@@ -3,48 +3,52 @@ import pandas as pd
 import plotly.graph_objects as go
 import pickle
 import os
+import requests
 from prophet import Prophet
 
-# Set page configuration
-st.set_page_config(
-    page_title="Demand Forecasting",
-    page_icon=":chart_with_upwards_trend:",
-    layout="wide",
-)
+# ✅ GitHub Raw URL for the CSV file (Update if Repo Changes)
+GITHUB_CSV_URL = "https://raw.githubusercontent.com/Sindhu-0716/PrepVector_ML_Sindhu/main/EnergyPredictor/PJME_hourly.csv"
 
-# Title and Styling
-st.markdown("""
-    <h1 style='text-align: center; color:#faa356;'>Demand Forecasting 📈</h1>
-    <h2 style='color:#a2d2fb;'>Problem Statement</h2>
-    <p>Energy demand forecasting is crucial for effective resource planning and management in the power sector. 
-    This app provides a user-friendly interface for forecasting electricity demand.</p>
-    """, unsafe_allow_html=True)
+# ✅ Define local file paths
+csv_file = "PJME_hourly.csv"
+model_file = "prophet_model.pkl"
 
-# ✅ Data Loading Function (Improved Error Handling)
-def get_data(file_path):
+# ✅ Function to download CSV if missing (for Streamlit Cloud)
+def download_csv():
+    if not os.path.exists(csv_file):
+        st.info(f"📥 Downloading CSV from GitHub: {GITHUB_CSV_URL}")
+        try:
+            response = requests.get(GITHUB_CSV_URL)
+            response.raise_for_status()  # Raise error if request fails
+            with open(csv_file, "wb") as file:
+                file.write(response.content)  # Save CSV locally
+            st.success("✅ File downloaded successfully!")
+        except requests.exceptions.RequestException as e:
+            st.error(f"❌ Failed to download file: {e}")
+            st.stop()
+
+# ✅ Load Data Function
+def get_data():
+    if not os.path.exists(csv_file):
+        download_csv()  # Download if missing
+
     try:
-        if not os.path.exists(file_path):
-            st.error(f"❌ File not found: {file_path}")
-            return None  
+        data = pd.read_csv(csv_file)
 
-        # Read CSV and ensure proper date format
-        data = pd.read_csv(file_path)
-        
-        # Ensure column names
+        # Ensure correct column names
         if "PJME_MW" in data.columns:
             data.rename(columns={"PJME_MW": "y"}, inplace=True)
-        
+
         # Convert first column to datetime
         if 'ds' in data.columns:
             data['ds'] = pd.to_datetime(data['ds'])
         else:
-            # Assuming first column is datetime
             data.rename(columns={data.columns[0]: 'ds'}, inplace=True)
             data['ds'] = pd.to_datetime(data['ds'])
 
         # Validate required columns
         if 'ds' not in data.columns or 'y' not in data.columns:
-            st.error("❌ Missing required columns 'ds' and 'y' for Prophet.")
+            st.error("❌ Missing required columns 'ds' and 'y'. Ensure CSV format is correct.")
             return None
 
         return data
@@ -52,38 +56,49 @@ def get_data(file_path):
         st.error(f"Error loading data: {e}")
         return None
 
+# ✅ Set Page Configuration
+st.set_page_config(
+    page_title="Demand Forecasting",
+    page_icon=":chart_with_upwards_trend:",
+    layout="wide",
+)
+
+# ✅ Title & Styling
+st.markdown("""
+    <h1 style='text-align: center; color:#faa356;'>Demand Forecasting 📈</h1>
+    <h2 style='color:#a2d2fb;'>Problem Statement</h2>
+    <p>Energy demand forecasting is crucial for effective resource planning and management in the power sector. 
+    This app provides a user-friendly interface for forecasting electricity demand.</p>
+    """, unsafe_allow_html=True)
+
 # ✅ Load & Show Raw Data
 st.write("### Raw Data")
-file_path = "PJME_hourly.csv"
+raw_data = get_data()
 
-raw_data = get_data(file_path)  
-
-# 🛑 Stop the app if data is missing
+# 🛑 Stop if data is missing
 if raw_data is None:
     st.stop()
 
-# Display the first few rows
+# ✅ Display First Few Rows
 st.dataframe(raw_data.head())
 
-# ✅ Forecasting Model Selection
+# ✅ Model Handling
 st.markdown("<h2 style='color:#a2d2fb;'>Energy Demand Forecasting</h2>", unsafe_allow_html=True)
 
-model_path = "prophet_model.pkl"
+# ✅ Check if Model Exists
+if not os.path.exists(model_file):
+    st.warning(f"⚠️ Model file not found: {model_file}. Training a new model...")
 
-# Check if model exists
-if not os.path.exists(model_path):
-    st.error(f"❌ Model file not found: {model_path}. Please train and save the model first.")
-    if st.button("Train Model"):
-        with st.spinner("Training model..."):
-            model = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True)
-            model.fit(raw_data[['ds', 'y']])  # Fit only 'ds' and 'y' columns
-            with open(model_path, "wb") as file:
-                pickle.dump(model, file)
-        st.success("✅ Model trained and saved successfully! Refresh the page to use it.")
-    st.stop()
+    # ✅ Train & Save Model
+    with st.spinner("Training model..."):
+        model = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True)
+        model.fit(raw_data[['ds', 'y']])  # Fit only 'ds' and 'y' columns
+        with open(model_file, "wb") as file:
+            pickle.dump(model, file)
+        st.success("✅ Model trained and saved successfully! Reloading...")
 
-# ✅ Load Prophet Model
-with open(model_path, "rb") as file:
+# ✅ Load Model
+with open(model_file, "rb") as file:
     model = pickle.load(file)
 
 # ✅ Future Forecasting
@@ -100,14 +115,13 @@ st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].head())
 # ✅ Plot Forecast with Confidence Interval
 fig = go.Figure()
 
-# Plot actual data if available
-if raw_data is not None:
-    fig.add_trace(go.Scatter(x=raw_data["ds"], y=raw_data["y"], mode='lines', name='Actual Demand', line=dict(color='blue', width=2)))
+# 🔹 Plot actual data
+fig.add_trace(go.Scatter(x=raw_data["ds"], y=raw_data["y"], mode='lines', name='Actual Demand', line=dict(color='blue', width=2)))
 
-# Plot forecast
+# 🔹 Plot forecast
 fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode='lines', name='Forecast', line=dict(color='orange', width=2)))
 
-# Confidence interval shading
+# 🔹 Confidence interval shading
 fig.add_trace(go.Scatter(
     x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1], 
     y=forecast["yhat_upper"].tolist() + forecast["yhat_lower"].tolist()[::-1],
