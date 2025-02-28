@@ -17,96 +17,75 @@ model_file = "prophet_model.pkl"
 # ✅ Function to download files
 def download_file(url, save_path):
     if not os.path.exists(save_path):
-        st.info(f"📥 Downloading: {url}")
         try:
             response = requests.get(url)
             response.raise_for_status()
             with open(save_path, "wb") as file:
                 file.write(response.content)
-            st.success(f"✅ Downloaded successfully: {save_path}")
         except requests.exceptions.RequestException as e:
             st.error(f"❌ Failed to download {url}: {e}")
             st.stop()
 
-# ✅ Load Data Function
+# ✅ Load Data Function (Mini Version)
 def get_data():
     download_file(GITHUB_CSV_URL, csv_file)  # Ensure CSV is available
-
     try:
         df = pd.read_csv(csv_file)
-
-        # Ensure correct column names
-        if "PJME_MW" in df.columns:
-            df.rename(columns={"PJME_MW": "y"}, inplace=True)
-
-        # Convert first column to datetime
-        if 'ds' in df.columns:
-            df['ds'] = pd.to_datetime(df['ds'])
-        else:
-            df.rename(columns={df.columns[0]: 'ds'}, inplace=True)
-            df['ds'] = pd.to_datetime(df['ds'])
-
-        # Validate required columns
-        if 'ds' not in df.columns or 'y' not in df.columns:
-            st.error("❌ Missing required columns 'ds' and 'y'. Ensure CSV format is correct.")
-            return None
-
-        return df
+        df.rename(columns={"PJME_MW": "y"}, inplace=True)
+        df.rename(columns={df.columns[0]: 'ds'}, inplace=True)
+        df["ds"] = pd.to_datetime(df["ds"])
+        return df.tail(5000)  # Load only last 5000 rows for efficiency
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
 
 # ✅ Set Page Configuration
 st.set_page_config(
-    page_title="Demand Forecasting",
+    page_title="Mini Demand Forecasting",
     page_icon=":chart_with_upwards_trend:",
     layout="wide",
 )
 
 # ✅ Title & Styling
-st.markdown("""
-    <h1 style='text-align: center; color:#faa356;'>Demand Forecasting 📈</h1>
-    <h2 style='color:#a2d2fb;'>Problem Statement</h2>
-    <p>Energy demand forecasting is crucial for effective resource planning and management in the power sector. 
-    This app provides a user-friendly interface for forecasting electricity demand.</p>
-    """, unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color:#faa356;'>Mini Demand Forecasting 📉</h1>", unsafe_allow_html=True)
 
 # ✅ Load & Show Raw Data
-st.write("### Raw Data")
+st.write("### Raw Data (Limited for Cloud)")
 raw_data = get_data()
-
-# 🛑 Stop if data is missing
 if raw_data is None:
     st.stop()
-
-# ✅ Display First Few Rows
 st.dataframe(raw_data.head())
 
-# ✅ Download Model from GitHub (if missing)
+# ✅ Download Model from GitHub (Mini Version)
 download_file(GITHUB_MODEL_URL, model_file)
 
-# ✅ Load Prophet Model
-with open(model_file, "rb") as file:
-    model = pickle.load(file)
+# ✅ Cache Model Loading to Reduce Memory Usage
+@st.cache_resource
+def load_model():
+    with open(model_file, "rb") as file:
+        return pickle.load(file)
 
-# ✅ Future Forecasting
-days = st.slider("Select Forecasting Days", min_value=1, max_value=60, value=7)
+# ✅ Load Prophet Model
+model = load_model()
+
+# ✅ Limited Forecasting (Mini Version)
+days = st.slider("Select Forecasting Days", min_value=1, max_value=7, value=3)  # Limit to 7 days
 forecast_hours = days * 24
 
 future = model.make_future_dataframe(periods=forecast_hours, freq='H')
 forecast = model.predict(future)
 
 # ✅ Show Forecasted Data
-st.write("### Forecasted Data")
+st.write("### Forecasted Data (Mini Version)")
 st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].head())
 
-# ✅ Plot Forecast with Confidence Interval
+# ✅ Plot Forecast (Mini Version)
 fig = go.Figure()
 
 # 🔹 Plot actual data
 fig.add_trace(go.Scatter(x=raw_data["ds"], y=raw_data["y"], mode='lines', name='Actual Demand', line=dict(color='blue', width=2)))
 
-# 🔹 Plot forecast (✅ Fixed Syntax Error)
+# 🔹 Plot forecast (Mini Version)
 fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode='lines', name='Forecast', line=dict(color='orange', width=2)))
 
 # 🔹 Confidence interval shading
@@ -119,5 +98,5 @@ fig.add_trace(go.Scatter(
     name='Confidence Interval'
 ))
 
-fig.update_layout(title="Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
+fig.update_layout(title="Mini Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
 st.plotly_chart(fig)
