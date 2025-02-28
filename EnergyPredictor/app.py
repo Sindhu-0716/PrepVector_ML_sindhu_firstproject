@@ -21,21 +21,30 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ✅ Data Loading Function
-def get_data(file_name):
+def get_data(file_path):
     try:
-        if not os.path.exists(file_name):
-            st.error(f"❌ File not found: {file_name}")
+        if not os.path.exists(file_path):
+            st.error(f"❌ File not found: {file_path}")
             return None  
+
+        # Read CSV and ensure proper date format
+        data = pd.read_csv(file_path, parse_dates=[0])
         
-        # Read CSV
-        data = pd.read_csv(file_name, parse_dates=[0])
+        # Rename columns if necessary
+        if "PJME_MW" in data.columns:
+            data.rename(columns={"PJME_MW": "y"}, inplace=True)
+        
+        # Ensure datetime format
+        if 'ds' in data.columns:
+            data['ds'] = pd.to_datetime(data['ds'])
+        else:
+            # Assuming first column is the date
+            data.rename(columns={data.columns[0]: 'ds'}, inplace=True)
+            data['ds'] = pd.to_datetime(data['ds'])
 
-        # Ensure 'ds' column exists
-        data = data.reset_index()  # Ensure datetime is a column, not an index
-        data.rename(columns={"index": "ds"}, inplace=True)
-
-        if 'ds' not in data.columns:
-            st.error("❌ Missing required column 'ds' for Prophet.")
+        # Ensure correct structure for Prophet
+        if 'ds' not in data.columns or 'y' not in data.columns:
+            st.error("❌ Missing required columns 'ds' and 'y' for Prophet.")
             return None
 
         return data
@@ -43,15 +52,13 @@ def get_data(file_name):
         st.error(f"Error loading data: {e}")
         return None
 
-
 # ✅ Load & Show Raw Data
 st.write("### Raw Data")
 file_path = "C:/Users/TeZZa/Downloads/PrepVector_ML_Sindhu/EnergyPredictor/PJME_hourly.csv"
 
 raw_data = get_data(file_path)  
 if raw_data is not None:
-    st.dataframe(raw_data)
-
+    st.dataframe(raw_data.head())
 
 # ✅ Forecasting Model Selection
 st.markdown("<h2 style='color:#a2d2fb;'>Energy Demand Forecasting</h2>", unsafe_allow_html=True)
@@ -61,6 +68,13 @@ model_path = "C:/Users/TeZZa/Downloads/PrepVector_ML_Sindhu/EnergyPredictor/prop
 # Check if model exists
 if not os.path.exists(model_path):
     st.error(f"❌ Model file not found: {model_path}. Please train and save the model first.")
+    if st.button("Train Model"):
+        with st.spinner("Training model..."):
+            model = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True)
+            model.fit(raw_data[['ds', 'y']])  # Fit only 'ds' and 'y' columns
+            with open(model_path, "wb") as file:
+                pickle.dump(model, file)
+        st.success("✅ Model trained and saved successfully! Refresh the page to use it.")
     st.stop()
 
 # ✅ Load Prophet Model
@@ -70,9 +84,33 @@ with open(model_path, "rb") as file:
 # ✅ Future Forecasting
 days = st.slider("Select Forecasting Days", min_value=1, max_value=60, value=7)
 forecast_hours = days * 24
+
 future = model.make_future_dataframe(periods=forecast_hours, freq='H')
 forecast = model.predict(future)
 
-# ✅ Plot Forecast
-fig = go.Figure([go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode='lines', name='Forecast')])
+# ✅ Show Forecasted Data
+st.write("### Forecasted Data")
+st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].head())
+
+# ✅ Plot Forecast with Confidence Interval
+fig = go.Figure()
+
+# Plot actual data if available
+if raw_data is not None:
+    fig.add_trace(go.Scatter(x=raw_data["ds"], y=raw_data["y"], mode='lines', name='Actual Demand', line=dict(color='blue', width=2)))
+
+# Plot forecast
+fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode='lines', name='Forecast', line=dict(color='orange', width=2)))
+
+# Confidence interval shading
+fig.add_trace(go.Scatter(
+    x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1], 
+    y=forecast["yhat_upper"].tolist() + forecast["yhat_lower"].tolist()[::-1],
+    fill='toself',
+    fillcolor='rgba(255, 165, 0, 0.2)',
+    line=dict(color='rgba(255,255,255,0)'),
+    name='Confidence Interval'
+))
+
+fig.update_layout(title="Energy Demand Forecast", xaxis_title="Date", yaxis_title="Demand (MW)")
 st.plotly_chart(fig)
